@@ -16,7 +16,7 @@
 set -e
 set -o pipefail
 
-function print_usage {
+print_usage() {
   echo
   echo "NAME"
   echo "	WP-me - a quick way to add VirtualHost, WP-CLI, and/or WordPress to your local development environment."
@@ -32,12 +32,12 @@ function print_usage {
   echo "	wp-me [--site-name <domain>] <flag(s)>"
   echo
   echo "OPTIONS"
-  echo "	--help			Show this usage message"
-  echo "	--site-name		Only the domain. Example: For https://www.ecotechie.io, use ecotechie "
-  echo "	--virtual-host		Verify and create Apache VirtualHost"
-  echo "	--wp-cli		Install WP-CLI with autocompletions, will prompt to remove if already installed"
-  echo "	--wordpress		Install WordPress and WP CLI if missing"
-  echo "	--debug			Debug script"
+  echo "	--help or -h			Show this usage message"
+  echo "	--site-name or -s		Only the domain. Example: For https://www.ecotechie.io, use ecotechie "
+  echo "	--virtual-host or -v		Verify and create Apache VirtualHost"
+  echo "	--wp-cli or -c		Install WP-CLI with autocompletions, will prompt to remove if already installed"
+  echo "	--wordpress or -w		Install WordPress and WP CLI if missing"
+  echo "	--debug or -d			Debug script"
   echo
   exit 1
 }
@@ -45,22 +45,22 @@ function print_usage {
 while [ ! $# -eq 0 ]
 do
   case "$1" in
-    --help)
+    -h|--help)
       print_usage
       ;;
-    --site-name)
+    -s|--site-name)
       site_name=$2
       ;;
-    --virtual-host)
+    -v|--virtual-host)
       virtual_host_flag="on"
       ;;
-    --wp-cli)
+    -c|--wp-cli)
       wp_cli_flag="on"
       ;;
-    --wordpress)
+    -w|--wordpress)
       wordpress_flag="on"
       ;;
-    --debug)
+    -d|--debug)
       debug_flag="on"
       ;;
     -*)
@@ -72,16 +72,19 @@ do
 done
 
 # Turn on debugging:
-[[ -n $debug_flag ]] &&
-  set -x &&
-    echo "Debugging"
+[[ -n $debug_flag ]] && {
+  set -x
+  echo "Debugging"
+}
 
+#TODO: fix this logic...
 # Verify minimum arguments:
-[[ -z "$site_name" && -z "$wp_cli_flag" ]] || [[ -z "$virtual_host_flag" && -z "$wp_cli_flag" && -z "$wordpress_flag" ]] &&
-  echo -e "The wp-me command must have the --site-name flag set and at least one of the option flags!" &&
-    print_usage
+[[ -z "$site_name" && -z "$wp_cli_flag" ]] || [[ -z "$virtual_host_flag" && -z "$wp_cli_flag" && -z "$wordpress_flag" ]] && {
+  echo -e "The wp-me command must have the --site-name flag set and at least one of the option flags!"
+  print_usage
+}
 
-function yes_no {
+yes_no() {
   while true
   do
     read -r -p "$* [Y/n] " answer
@@ -104,7 +107,7 @@ function yes_no {
   done
 }
 
-function validate_input {
+validate_input() {
   read -r -p "$*" input
   while true
   do
@@ -112,16 +115,16 @@ function validate_input {
 
     case $valid in
       [yY][eE][sS]|[yY]|"")
-      echo "$input"
-      break
-      ;;
+        echo "$input"
+        break
+        ;;
       [nN][oO]|[nN])
-      read -p "Enter again:" $input
-      ;;
+        read -p "Enter again:" $input
+        ;;
       *)
-      echo "Invalid input..."
-      echo
-      ;;
+        echo "Invalid input..."
+        echo
+        ;;
     esac
   done
 }
@@ -129,39 +132,43 @@ function validate_input {
 if [[ -n $virtual_host_flag || -n $wordpress_flag ]]; then
   # TLD to use for local site:
   yes_no "Use .localhost as the Top Level Domain?" &&
-    site_tld="localhost" ||
-      site_tld=$(validate_input "Top Level Domain for the site: ") &&
-        site_tld=${site_tld##*\.}
+  site_tld="localhost" ||
+  site_tld=$(validate_input "Top Level Domain for the site: ") &&
+  site_tld=${site_tld##*\.}
+
   site_path="/var/www/$site_name"
   # Apache needs to be running in order for this to work...
   apache_status=$(service apache2 status)
   systemctl is-active apache2 ||
-    echo "Apache server is not running, starting now..." &&
-      sudo systemctl restart apache2
+  echo "Apache server is not running, starting now..." &&
+  sudo systemctl restart apache2
 fi
 
-if [[ -n $virtual_host_flag ]]; then
+if [[ -n $virtual_host_flag && -n "$site_name" ]]; then
   site_enabled="/etc/apache2/sites-enabled/$site_name.conf"
   site_available="/etc/apache2/sites-available/$site_name.conf"
   echo
   echo
   echo "VirtualHost:"
   echo "============"
+
   # Remove the VirtualHost:
-  [ -e "$site_available" ] &&
-      echo &&
-        yes_no "[DANGER!] Delete $site_name VirtualHost?" &&
-          sudo rm $site_available &&
-            sudo a2dissite -q $site_name &&
-              sudo systemctl restart apache2 &&
-                echo "VirtualHost $site_name deleted."
+  [ -e "$site_available" ] && {
+    echo
+    yes_no "[DANGER!] Delelte $site_name's VirtualHost?"
+    sudo rm $site_available
+    sudo a2dissite -q $site_name
+    sudo systemctl restart apache2
+    echo "VirtualHost $site_name deleted."
+  }
 
   # Disable VirtualHost:
-  [ -e "$site_enabled" ] &&
-      echo &&
-        yes_no "Disable $site_name VirtualHost?" &&
-          sudo a2dissite -q $site_name &&
-            sudo systemctl restart apache2
+  [ -e "$site_enabled" ] && {
+    echo
+    yes_no "Disable $site_name VirtualHost?"
+    sudo a2dissite -q $site_name
+    sudo systemctl restart apache2
+  }
 
   # Add VirtualHost:
   echo
@@ -210,8 +217,8 @@ if [[ -n $virtual_host_flag ]]; then
 
     # Enable VirtualHost and restart Apache and MySQL:
     sudo a2ensite -q "$site_name" &&
-      echo "Restarting Apache and MySQL servers." &&
-        sudo systemctl restart apache2 mysql
+    echo "Restarting Apache and MySQL servers." &&
+    sudo systemctl restart apache2 mysql
   fi
 fi
 
@@ -221,7 +228,7 @@ if [[ -n $wp_cli_flag ]]; then
   echo "WP-CLI:"
   echo "======="
   echo
-  function install_wp_cli {
+  install_wp_cli() {
     # Traverse through each path in $PATH and check if we can write to it. If so, install WP-CLI there:
     IFS=:; set -o noglob
     for dir in $PATH""; do
@@ -230,7 +237,7 @@ if [[ -n $wp_cli_flag ]]; then
         echo
         echo
         curl --output $dir/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar &&
-          chmod +x $dir/wp
+        chmod +x $dir/wp
         echo
         wp --info
         break
@@ -240,8 +247,8 @@ if [[ -n $wp_cli_flag ]]; then
     # Check for the WP-CLI Bash completion file and offer to install if it does not exist:
     if [[ ! -e $HOME/.wp-cli/wp-completion.bash ]] && yes_no "Setup  WP-CLI command autocompletion for Bash?"; then
       curl --create-dirs -o $HOME/.wp-cli/wp-completion.bash https://raw.githubusercontent.com/wp-cli/wp-cli/master/utils/wp-completion.bash &&
-        echo "source $HOME/.wp-cli/wp-completion.bash #WP-CLI-Install" >> $HOME/.bashrc &&
-          . $HOME/.bashrc
+      echo "source $HOME/.wp-cli/wp-completion.bash #WP-CLI-Install" >> $HOME/.bashrc &&
+      . $HOME/.bashrc
     fi
   }
 
@@ -253,17 +260,18 @@ if [[ -n $wp_cli_flag ]]; then
 
     if yes_no "Remove WP-CLI?"; then
       sudo rm -rf $wp_cli_location &&
-        echo "WP-CLI executable removed"
+      echo "WP-CLI executable removed"
 
       echo
-      yes_no "Remove WP-CLI's directory and settings?" &&
-        sudo rm -rf $HOME/.wp-cli &&
-          sed -i "/#WP-CLI-Install/d" $HOME/.bashrc &&
-            echo "WP-CLI completely removed..."
+      yes_no "Remove WP-CLI's directory and settings?" && {
+        sudo rm -rf $HOME/.wp-cli
+        sed -i "/#WP-CLI-Install/d" $HOME/.bashrc
+        echo "WP-CLI completely removed..."
+      }
     fi
     echo
     yes_no "Replace current WP-CLI version with this one?" &&
-      install_wp_cli
+    install_wp_cli
   else
     install_wp_cli
   fi
@@ -285,39 +293,58 @@ if [[ -n $wordpress_flag ]]; then
     echo "$site_path contents:"
     ls $site_path
     echo
-    yes_no "[DANGER!] Remove direcotry?" &&
-      sudo rm -rf "$site_path" &&
-        echo "Files removed." &&
-          mkdir -p "$site_path" &&
-            wp core download --path=$site_path
-  fi
-  [ ! -d "$site_path" ] &&
-    mkdir -p "$site_path" &&
+    yes_no "[DANGER!] delete old content and install WordPress?" && {
+      sudo rm -rf "$site_path"
+      echo "Files removed."
+      mkdir -p "$site_path"
       wp core download --path=$site_path
+    }
+  else
+    mkdir -p "$site_path"
+    wp core download --path=$site_path
+  fi
+
   cd $site_path
 
-  function get_db_config {
+  get_db_config() {
     echo
     db_name="$(validate_input "Database name: ")"
     echo
     db_user="$(validate_input "Database user: ")"
     echo
-    db_password="$(validate_input "Database password: ")"
+    db_password="$(validate_input "Database user password: ")"
     echo
-    wp config create --dbname=$db_name --dbuser=$db_user --dbpass=$db_password --extra-php <<-PHP
-		define( 'WP_DEBUG', true );
-		define( 'WP_DEBUG_DISPLAY', true );
-		define( 'FS_METHOD', 'direct' );
-		define( 'FS_CHMOD_DIR', ( 0775 & ~ umask() ) );
-		define( 'FS_CHMOD_FILE', ( 0664 & ~ umask() ) );
-		PHP
+    wp config create --dbname=$db_name --dbuser=$db_user --dbpass=$db_password
+    wp config set WP_DEBUG true --raw
+    wp config set WP_DEBUG_DISPLAY true --raw
+    wp config set FS_METHOD direct
+    wp config set FS_CHMOD_DIR "( 0775 & ~ umask() )" --raw
+    wp config set FS_CHMOD_FILE "( 0664 & ~ umask() )" --raw
   }
 
+  grep "config create:" ~/.wp-cli/config.yml -q -s || {
+    if [[ -e ~/.wp-cli/config.yml ]]; then
+      echo "Creating a WP-CLI config file at ~/.wp-cli/config.yml"
+      echo "This will allow us to add a default database user and password..."
+      touch ~/.wp-cli/config.yml
+    fi
+    echo
+    echo "Let's add a database user with permissions to edit it."
+    db_user_config="$(validate_input "Database user: ")"
+    echo
+    db_password_config="$(validate_input "Database user password: ")"
+    sed -i "1i config create:\n    dbuser: $db_user_config\n    dbpass: $db_password_config" ~/.wp-cli/config.yml
+  }
+
+
+  # TODO manage this file better, should back up existing file and create a new one. Ideally with info from the config.yml file.
+  # https://make.wordpress.org/cli/handbook/references/config/#config-files
   # If wp-config.php exists in path maybe overwrite:
   if [[ -e $site_path/wp-config.php ]]; then
     if yes_no "[DANGER!] wp-config.php file exists! Overwrite it?"; then
-      mv "$site_path/wp-config.php" "$site_path/wp-config.backup" &&
-        echo "Moved to $site_path/wp-config.backup"
+      mv "$site_path/wp-config.php" "$site_path/wp-config.backup.php" &&
+      echo "Moved to $site_path/wp-config.backup.php"
+
       get_db_config
     else
       db_name="$(cat $site_path/wp-config.php | grep DB_NAME | cut -d \' -f 4)"
@@ -330,28 +357,21 @@ if [[ -n $wordpress_flag ]]; then
   fi
 
   echo
-  # Set file/directory permissions and ownership:
-  echo "Setting permissions: file (644) and directory (755)."
-  sudo find $site_path -type f -exec chmod 664 {} \; &
-  sudo find $site_path -type d -exec chmod 775 {} \; &
-  echo "Setting ownership of $site_path to $user:$group"
-  sudo chown -R $user:$group $site_path &
-
-  echo
   echo
   echo "Creating database:"
   echo "=================="
   echo
   # Is MySQL running?
   systemctl is-active mysql ||
-    echo "MySQL server is not running, starting now..." &&
-      sudo systemctl restart mysql
+  echo "MySQL server is not running, starting now..." &&
+  sudo systemctl restart mysql
+
   # Do we have an existing database?
   if [[ $(wp db check 2> /dev/null) ]]; then
     yes_no "Database exists, drop and re-create?" &&
-      wp db drop --yes &&
-        wp db create ||
-          echo "Leaving existing database as is..."
+    wp db drop --yes &&
+    wp db create ||
+    echo "Leaving existing database as is..."
   else
     wp db create
   fi
@@ -362,12 +382,24 @@ if [[ -n $wordpress_flag ]]; then
   echo "====================="
   echo
   wp core is-installed &&
-    echo "WordPress installation exists... Skipping." ||
-      wp core install --prompt=url,title,admin_user,admin_password,admin_email --skip-email
+  echo "WordPress installation exists... Skipping." ||
+  wp core install --prompt=url,title,admin_user,admin_password,admin_email --skip-email
+
+  echo
+  # Set file/directory permissions and ownership:
+  echo "Setting permissions: file (644) and directory (755)."
+  sudo find $site_path -type f -exec chmod 664 {} \; &
+  sudo find $site_path -type d -exec chmod 775 {} \; &
+  echo "Setting ownership of $site_path to $user:$group"
+  sudo chown -R $user:$group $site_path &
 
   echo
   if yes_no "Import a database?"; then
     db_file=$(validate_input "Database dump file path: ")
+    while [[ ! -e $db_file ]]; do
+      echo "Import file missing or not readable";
+      db_file=$(validate_input "Database dump file path: ")
+    done
     wp db import $db_file
     siteurl=$(wp option get siteurl)
     siteurl=${siteurl##*//}
@@ -375,6 +407,9 @@ if [[ -n $wordpress_flag ]]; then
       wp search-replace $siteurl $site_name.$site_tld
     fi
   fi
+  echo "Rewriting permalink structure:"
+  echo
+  wp rewrite structure '/%postname%/'
 fi
 
 if [[ -n $virtual_host_flag || -n $wordpress_flag ]]; then
@@ -383,8 +418,9 @@ if [[ -n $virtual_host_flag || -n $wordpress_flag ]]; then
   echo "$site_name has been added."
   echo "URL: https://$site_name.$site_tld"
   echo "Local directory: $site_path"
-  [[ -e $(which xdg-open) ]] &&
-    yes_no "Open $site_name in browser?" &&
-      xdg-open "https://$site_name.$site_tld"
+  [[ -e $(which xdg-open) ]] && {
+    yes_no "Open $site_name in browser?"
+    xdg-open "https://$site_name.$site_tld"
+  }
 fi
-exit
+exit 0
